@@ -1,17 +1,366 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>TryBest-个人主页</title>
+    <title>打飞机 v0.1</title>
+    <style>
+        body,
+        div,
+        p,
+        h1,
+        h2,
+        h3,
+        table {
+            border: 0;
+            margin: 0;
+        }
 
-    <!----
-        外部文件导入
-    ---->
-    <link rel="stylesheet" href="css/style.css" type="text/css">
+        html {
+            font-family: "微软雅黑";
+        }
+
+        body {
+            overflow: hidden;
+        }
+
+        #gameBox {
+            width: 100%;
+            height: 100%;
+        }
+
+        /*游戏界面样式*/
+
+        #gameInterface {
+            position: relative;
+            width: 500px;
+            height: 760px;
+            margin: 20px auto;
+            overflow: hidden;
+            background: url("img/bg_1.jpg") repeat-y;
+            background-size: 500px 768px;
+        }
+
+        #startInterface {
+            text-align: center;
+            padding-top: 80px;
+            color: cornflowerblue;
+            user-select: none;
+            -moz-user-select: none;
+            -o-user-select: none;
+            -ms-user-select: none;
+        }
+
+        #startInterface h1 {
+            font-size: 45px;
+            margin-bottom: 20px;
+            cursor: default;
+        }
+
+        #startInterface p {
+            display: block;
+            font-size: 24px;
+            width: 120px;
+            height: 40px;
+            line-height: 40px;
+            margin: 10px auto;
+            border: 1px solid #999;
+            cursor: pointer;
+        }
+
+        #gameInterface .plan,
+        #gameInterface .fire,
+        #gameInterface .boom {
+            position: absolute;
+        }
+
+        #gameInterface .boom {
+            animation: boomAnima .5s;
+            animation-fill-mode: forwards;
+        }
+
+        @keyframes boomAnima {
+            0% {
+                opacity: 0
+            }
+            50% {
+                opacity: 1
+            }
+            100% {
+                opacity: 0
+            }
+        }
+
+        .hide {
+            display: none;
+        }
+
+        #restart {
+            display: none;
+            width: 100px;
+            height: 40px;
+            position:absolute;
+            left:200px;
+            top:300px;
+            line-height: 40px;
+            text-align: center;
+            cursor: pointer;
+            background: #eee;
+        }
+    </style>
 </head>
+
 <body>
-    
+    <div id="gameBox">
+        <div id="gameInterface">
+            <div id="startInterface">
+                <h1>打飞机 v0.1</h1>
+                <p>简单</p>
+                <p>普通</p>
+                <p>困难</p>
+                <p>恶魔</p>
+            </div>
+            <div id="restart">
+                重新开始
+            </div>
+            <div id='War'></div>
+        </div>
+
+    </div>
+
+
+    <script>
+        var gameBox = document.getElementById("gameBox"),
+            gameInterface = document.getElementById("gameInterface"),
+            startInterface = document.getElementById('startInterface'),
+            gameWar = document.getElementById("War"),
+            gameWarChild = gameWar.children,
+            difSelect = gameInterface.getElementsByTagName('p'),
+            oRestart = document.getElementById('restart'),
+            over = [];
+
+
+        //游戏开始
+        for (var i = 0; i < difSelect.length; i++) {
+            (function (i) {
+                difSelect[i].onclick = function () {
+                    startInterface.classList.add('hide');
+                    oPlan.classList.remove('hide');
+                    startGame(i);
+                }
+            })(i);
+        }
+        function startGame(level) {
+            //背景移动
+            var m = 0;
+            function bgMove() {
+                m++;
+                gameInterface.style.backgroundPositionY = m + "px";
+                requestAnimationFrame(bgMove);
+            }
+            //初始化我方飞机
+            fPlan();
+            var oAttack = attack(level);
+            var eAttack = enemyAttack(level);
+            requestAnimationFrame(bgMove);
+            over = [oAttack, eAttack];
+        }
+
+        //游戏结束
+        function gameOver(over) {
+            clearInterval(over[0]);
+            clearInterval(over[1]);
+            oRestart.style.display = "block";
+            oRestart.onclick = function () {
+                startInterface.classList.remove('hide');
+                oRestart.style.display = "none";
+            }
+        }
+
+        /************************
+        *创建飞机 飞机事件
+        *************************/
+        var oPlan = new Image();
+        oPlan.width = 70;
+        oPlan.height = 70;
+        oPlan.src = "img/plane_1.png";
+        oPlan.className = 'plan hide';
+        gameInterface.appendChild(oPlan);
+        //禁止飞机被选中
+        document.onmousedown = function (e) {
+            e.preventDefault()
+        }
+        function fPlan(e) {
+            e = e || window.event;
+            //飞机移动速度
+            var speed = 7;
+            //游戏界面边界值
+            var lMin = -oPlan.offsetWidth / 2,
+                tMin = 0,
+                rMax = gameInterface.offsetWidth - oPlan.offsetWidth / 2,
+                bMax = gameInterface.offsetHeight - oPlan.offsetHeight / 3;
+            //飞机初始位置
+            var leftX = gameInterface.offsetWidth / 2 - oPlan.offsetWidth / 2,
+                topY = gameInterface.offsetHeight / 2 + oPlan.offsetHeight;
+            oPlan.style.left = leftX + "px";
+            oPlan.style.top = topY + "px";
+
+            var key_pressed = {};
+            document.addEventListener("keydown", function (e) {
+                key_pressed[e.keyCode] = true;
+                return false;
+            });
+            document.addEventListener("keyup", function (e) {
+                key_pressed[e.keyCode] = false;
+                return false;
+            });
+            requestAnimationFrame(move);
+            //飞机移动
+            function move() {
+                for (var key in key_pressed) {
+                    if (key_pressed[key]) {
+                        switch (key) {
+                            case '65'://左 a
+                                leftX -= speed;
+                                leftX = Math.max(leftX, lMin);
+                                oPlan.style.left = leftX + "px";
+                                break;
+                            case '68'://右 d
+                                leftX += speed;
+                                leftX = Math.min(leftX, rMax);
+                                oPlan.style.left = leftX + "px";
+                                break;
+                            case '87'://上 w
+                                topY -= speed;
+                                topY = Math.max(topY, tMin);
+                                oPlan.style.top = topY + "px";
+                                break;
+                            case '83'://下 s
+                                topY += speed;
+                                topY = Math.min(topY, bMax);
+                                oPlan.style.top = topY + "px";
+                                break;
+                        }
+                    }
+                }
+                requestAnimationFrame(move);
+            }
+        }
+        //我方飞机进攻
+        function attack(level) {
+            var ourAttack = setInterval(function () {
+                var oFire = new Image();
+                oFire.width = 20;
+                oFire.height = 30;
+                oFire.className = "fire";
+                oFire.src = "img/fire.png";
+                oFire.style.left = oPlan.offsetLeft + oPlan.offsetWidth / 2 - oFire.width / 2 + 'px';
+                oFire.style.top = oPlan.offsetTop - oPlan.offsetHeight / 2 + 10 + 'px';
+                gameInterface.appendChild(oFire);
+                function m() {
+                    var top = oFire.offsetTop - 18;
+                    if (top < -oFire.height) {
+                        gameInterface.removeChild(oFire);
+                    } else {
+                        var length = gameWarChild.length;
+                        //判断敌军存在
+                        if (length) {
+                            for (var i = 0; i < length; i++) {
+                                if (decide(oFire, gameWarChild[i])) {
+                                    boom(gameWarChild[i]);
+                                    gameInterface.removeChild(oFire);
+                                    gameWar.removeChild(gameWarChild[i]);
+                                    return;
+                                }
+                            }
+                        }
+                        oFire.style.top = top + 'px';
+                        requestAnimationFrame(m);
+                    }
+                }
+                setTimeout(function () {
+                    requestAnimationFrame(m);
+                }, 50);
+            }, [100, 100, 200, 300][level]);
+            return ourAttack;
+        }
+
+        /************************
+        * 创建敌方飞机 敌方飞机事件
+        *************************/
+        function enemyAttack(level) {
+            var eAttack = setInterval(function () {
+                //随机创建敌方飞机
+                var enemyPlan = new Image();
+                enemyPlan.width = 70;
+                enemyPlan.height = 70;
+                enemyPlan.src = "img/enemy_small.png";
+                enemyPlan.className = 'plan';
+                enemyPlan.style.top = '0px';
+                gameWar.appendChild(enemyPlan);
+                var randPosition = Math.floor(Math.random() * (gameInterface.offsetWidth - enemyPlan.offsetWidth));
+                enemyPlan.style.left = randPosition + 'px';
+                function m() {
+                    var top = enemyPlan.offsetTop + 5 + level * 3;//飞机产生速度
+                    if (top > enemyPlan.height + gameInterface.offsetHeight) {
+                        gameWar.removeChild(enemyPlan);
+                    } else {
+                        if (decide(oPlan, enemyPlan)) {
+                            if (oPlan.offsetParent) {
+                                boom(enemyPlan);
+                                boom(oPlan);
+                                oPlan.classList.add('hide');
+                                gameWar.removeChild(enemyPlan);
+                                //游戏结束
+                                gameOver(over);
+                            }
+                            return;
+                        } else {
+                            enemyPlan.style.top = top + 'px';
+                            requestAnimationFrame(m);
+                        }
+                    }
+                }
+
+                setTimeout(function () {
+                    requestAnimationFrame(m);
+                }, 50);
+            }, [1000, 800, 500, 300][level]);
+            return eAttack;
+        }
+
+        //判定触碰
+        function decide(obj1, obj2) {
+            var T1 = obj1.offsetTop,
+                B1 = obj1.offsetHeight + obj1.offsetTop,
+                L1 = obj1.offsetLeft,
+                R1 = obj1.offsetLeft + obj1.offsetWidth;
+            var T2 = obj2.offsetTop,
+                B2 = obj2.offsetTop + obj2.offsetHeight,
+                L2 = obj2.offsetLeft,
+                R2 = obj2.offsetLeft + obj2.offsetWidth;
+            return !(R1 < L2 || B1 < T2 || L1 > R2 || T1 > B2);
+        }
+
+        //飞机爆炸特效
+        function boom(obj) {
+            var posX = obj.offsetLeft,
+                posY = obj.offsetTop;
+            var boomImg = new Image();
+            boomImg.src = "img/boom_big.png";
+            boomImg.className = "boom";
+            boomImg.style.left = posX + "px";
+            boomImg.style.top = posY + "px";
+            gameInterface.appendChild(boomImg);
+            setTimeout(function () {
+                gameInterface.removeChild(boomImg);
+            }, 1000);
+        }
+
+
+    </script>
 </body>
+
 </html>
